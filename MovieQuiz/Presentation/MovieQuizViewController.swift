@@ -1,6 +1,7 @@
 import UIKit
 
-final class MovieQuizViewController: UIViewController, QuestionFactoryDelegate, AlertPresenterDelegate {
+final class MovieQuizViewController: UIViewController, QuestionFactoryDelegate {
+    
     
     // MARK: - IBOutlet
     @IBOutlet private var imageView: UIImageView!
@@ -17,6 +18,8 @@ final class MovieQuizViewController: UIViewController, QuestionFactoryDelegate, 
     private let questionsAmount: Int = 10
     private var questionFactory: QuestionFactoryProtocol?
     
+    private var alertPresenter: AlertPresenter?
+    
     private var statisticService: StatisticServiceProtocol?
     
     // MARK: - Public methods
@@ -29,6 +32,7 @@ final class MovieQuizViewController: UIViewController, QuestionFactoryDelegate, 
         questionFactory.delegate = self
         self.questionFactory = questionFactory
         questionFactory.requestNextQuestion()
+        alertPresenter = AlertPresenter(delegate: self)
     }
     
     //MARK: -QuestionFactoryDeledate
@@ -47,26 +51,6 @@ final class MovieQuizViewController: UIViewController, QuestionFactoryDelegate, 
     }
     override var preferredStatusBarStyle: UIStatusBarStyle {
         return .lightContent
-    }
-    
-    //MARK: AlertPresenterDelegate
-    
-    func showAlert(model: AlertModel) {
-        let alert = UIAlertController(title: model.title, message: model.message, preferredStyle: .alert)
-        
-        let action = UIAlertAction(title: model.buttonText, style: .default) {[weak self] _ in
-            guard let self = self else { return }
-            
-            self.currentQuestionIndex = 0
-            self.correctAnswers = 0
-            
-            self.questionFactory?.requestNextQuestion()
-            
-        }
-        
-        alert.addAction(action)
-        
-        present(alert, animated: true, completion: model.completion)
     }
     
     // MARK: - Private methods
@@ -141,10 +125,14 @@ final class MovieQuizViewController: UIViewController, QuestionFactoryDelegate, 
                             Средняя точность: \(String(format: "%.2f", statisticService?.totalAccuracy ?? 0))%
                             """,
                             buttonText: "Сыграть еще раз",
-                            completion: nil)
-            let alertPresenter = AlertPresenter()
-            alertPresenter.delegate = self
-            alertPresenter.presenterAlert(model: alertModel)
+                            completion: { [weak self] in
+                                guard let self = self else { return }
+                                self.currentQuestionIndex = 0
+                                self.correctAnswers = 0
+                                questionFactory?.requestNextQuestion()
+                            })
+            
+            alertPresenter?.showAlert(model: alertModel)
         } else {
             currentQuestionIndex += 1
             questionFactory?.requestNextQuestion()
