@@ -2,10 +2,10 @@ import UIKit
 
 final class MovieQuizViewController: UIViewController, QuestionFactoryDelegate {
     
-    
     // MARK: - IBOutlet
     @IBOutlet private var imageView: UIImageView!
     @IBOutlet private var textLabel: UILabel!
+    @IBOutlet private var activityIndicator: UIActivityIndicatorView!
     @IBOutlet private var counterLabel: UILabel!
     @IBOutlet private var noButton: UIButton!
     @IBOutlet private var yesButton: UIButton!
@@ -27,11 +27,13 @@ final class MovieQuizViewController: UIViewController, QuestionFactoryDelegate {
     override func viewDidLoad() {
         super.viewDidLoad()
         imageView.layer.cornerRadius = 20
-        let questionFactory = QuestionFactory()
+        let questionFactory = QuestionFactory(moviesLoader: MoviesLoader(), delegate: self)
         statisticService = StatisticServiceImplementation()
-        questionFactory.delegate = self
         self.questionFactory = questionFactory
         questionFactory.requestNextQuestion()
+        
+        showLoadingIndicator()
+        questionFactory.loadData()
         alertPresenter = AlertPresenter(delegate: self)
     }
     
@@ -53,21 +55,25 @@ final class MovieQuizViewController: UIViewController, QuestionFactoryDelegate {
         return .lightContent
     }
     
+    func didLoadDataFromServer() {
+        //DispatchQueue.main.async { [weak self] in
+            //guard let self = self else { return }
+        activityIndicator.isHidden = true
+        //}
+        questionFactory?.requestNextQuestion()
+    }
+    
+    func didFailToLoadData(with error: Error) {
+        showNetworkError(message: error.localizedDescription)
+    }
+    
     // MARK: - Private methods
     
     // конвертируем моковые данные во вью модель
     private func convert(model: QuizQuestion) -> QuizStepViewModel {
-        let converted: QuizStepViewModel
-        if let value = UIImage(named: model.image) {
-            converted = QuizStepViewModel(image: value,
-                                          question: model.text,
-                                          questionNumber: "\(currentQuestionIndex + 1)/\(questionsAmount)")
-        } else {
-            converted = QuizStepViewModel(image: UIImage(),
-                                          question: model.text,
-                                          questionNumber: "\(currentQuestionIndex + 1)/\(questionsAmount)")
-        }
-       return converted
+        QuizStepViewModel(image: UIImage(data: model.image) ?? UIImage(),
+                          question: model.text,
+                          questionNumber: "\(currentQuestionIndex + 1)/\(questionsAmount)")
     }
     
     // окрашиваем рамку 
@@ -90,7 +96,6 @@ final class MovieQuizViewController: UIViewController, QuestionFactoryDelegate {
             guard let self = self else { return }
             self.showNextQuestionOrResult()
             self.imageView.layer.borderWidth = 0
-            self.unlockButtons() // разрешаем нажатия на кнопки когда появляется следующий вопрос
         }
 
     }
@@ -129,6 +134,7 @@ final class MovieQuizViewController: UIViewController, QuestionFactoryDelegate {
                                 guard let self = self else { return }
                                 self.currentQuestionIndex = 0
                                 self.correctAnswers = 0
+                                unlockButtons()
                                 questionFactory?.requestNextQuestion()
                             })
             
@@ -136,7 +142,30 @@ final class MovieQuizViewController: UIViewController, QuestionFactoryDelegate {
         } else {
             currentQuestionIndex += 1
             questionFactory?.requestNextQuestion()
+            unlockButtons()
         }
+    }
+    
+    private func showLoadingIndicator() {
+        activityIndicator.isHidden = false
+        activityIndicator.startAnimating()
+    }
+    
+    private func hideLoadingIndicator() {
+        activityIndicator.isHidden = true
+    }
+    private func showNetworkError(message: String) {
+        hideLoadingIndicator()
+        let errorAlertModel = AlertModel(title: "Error",
+                                    message: message,
+                                    buttonText: "Попробовать еще раз",
+                                    completion: { [weak self] in
+                                        guard let self = self else { return }
+                                        self.currentQuestionIndex = 0
+                                        self.correctAnswers = 0
+                                        self.questionFactory?.requestNextQuestion()
+                                    })
+        alertPresenter?.showAlert(model: errorAlertModel)
     }
     
     
