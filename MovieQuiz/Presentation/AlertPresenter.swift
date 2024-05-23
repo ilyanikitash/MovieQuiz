@@ -10,7 +10,8 @@ final class AlertPresenter: AlertPresenterDelegate {
         let alertController = UIAlertController(title: model.title,
                                                 message: model.message,
                                                 preferredStyle: .alert)
-        let action = UIAlertAction(title: model.buttonText, 
+        alertController.view.accessibilityIdentifier = "Result Alert"
+        let action = UIAlertAction(title: model.buttonText,
                                    style: .default) { _ in
                     model.completion()
                 }
